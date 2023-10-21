@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: '2023-10-02'
+Description: Stack for creating an EC2 instance with auto-scaling and security group rules
+
+Resources:
+  
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-xxxxxxxxxxxxx 
+      InstanceType: t2.micro # Para cargas variables y bajo consumo de CPU
+      KeyName: my-key-pair 
+
+      # Grupos de seguridad asociados a la instancia
+      SecurityGroups:
+        - !Ref MySecurityGroup # Reglas de firewall
+
+      # Configuracion de inicializacion
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Instala Node.js
+          curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+
+
+  # Reglas de seguridad del grupo
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+
+    Properties:
+      GroupDescription: Security group for the EC2 instance
+
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+
+  # Reglas de escalado
+  MyAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup 
+    Properties:
+      AvailabilityZones: 
+        - !GetAZs '' # Obtiene las zonas disponibles en una región específica de AWS
+      LaunchConfigurationName: !Ref MyLaunchConfig
+      MinSize: 1
+      MaxSize: 3
+      DesiredCapacity: 2
+
+      VPCZoneIdentifier:
+        - subnet-xxxxxxxxxxxxx
+      Tags:
+        - Key: Name
+          Value: MyAutoScalingGroup
+          PropagateAtLaunch: 'true'
+
+
+  # Configuración de inicio
+  MyLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: ami-xxxxxxxxxxxxx
+      InstanceType: t2.micro
+      KeyName: my-key-pair
+      SecurityGroups:
+        - !Ref MySecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Instala Node.js
+          curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          # Agregar cualquier otra configuración necesaria aquí
+
+
+# Obtener la dirección IP pública de la instancia
+Outputs:
+  EC2InstancePublicIP:
+    Description: Public IP address of the EC2 instance
+    Value: !GetAtt MyEC2Instance.PublicIp
